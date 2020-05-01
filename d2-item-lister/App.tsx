@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import _ from "lodash";
 import totalState from "./TotalState.json";
 import styled from "styled-components/native";
 import { Item, ItemWithSource, State } from "./types";
@@ -51,8 +50,10 @@ function isGem(i: Item) {
 export default function App() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showUnique, setShowUnique] = useState(true);
+  const [showSets, setShowSets] = useState(true);
   const [showGems, setShowGems] = useState(false);
   const [showRunes, setShowRunes] = useState(false);
+  const [onlyShowFilters, setOnlyShowFilters] = useState(false);
 
   let itemsToShow =
     searchTerm.length === 0
@@ -71,13 +72,16 @@ export default function App() {
     if (i.unique_name !== undefined) {
       return showUnique;
     }
+    if (i.set_name !== undefined) {
+      return showSets;
+    }
     if (isGem(i)) {
       return showGems;
     }
     if (i.type_name.includes("Rune")) {
       return showRunes;
     }
-    return true;
+    return !onlyShowFilters;
   });
 
   // itemsToShow = _.orderBy(itemsToShow, "level");
@@ -99,9 +103,16 @@ export default function App() {
 
       <View style={styles.filterRow}>
         <FilterSelect
+          titleColor="goldenrod"
           title="Unique"
           value={showUnique}
           onValueChange={setShowUnique}
+        />
+        <FilterSelect
+          titleColor="lime"
+          title="Sets"
+          value={showSets}
+          onValueChange={setShowSets}
         />
         <FilterSelect
           title="Gems"
@@ -112,6 +123,11 @@ export default function App() {
           title="Runes"
           value={showRunes}
           onValueChange={setShowRunes}
+        />
+        <FilterSelect
+          title="Only show Filters"
+          value={onlyShowFilters}
+          onValueChange={setOnlyShowFilters}
         />
       </View>
       <ItemRow style={styles.tableHeader}>
@@ -132,6 +148,12 @@ export default function App() {
       </ItemRow>
       <ScrollView>
         {itemsToShow.map((item) => {
+          const uniqueOrSetName = item.set_name || item.unique_name;
+          let uniqueOrSetStyle = styles.linkText;
+          if (item.set_name) {
+            uniqueOrSetStyle = styles.setItemText;
+          }
+
           return (
             <ItemRow style={styles.itemRow}>
               <ColumnText width={120} textAlign="center">
@@ -161,9 +183,7 @@ export default function App() {
                   )
                 }
               >
-                <LinkText style={styles.linkText}>
-                  {item.set_name || item.unique_name}
-                </LinkText>
+                <LinkText style={uniqueOrSetStyle}>{uniqueOrSetName}</LinkText>
               </TouchableOpacity>
             </ItemRow>
           );
@@ -185,7 +205,11 @@ const styles = StyleSheet.create({
   },
   linkText: {
     width: 260,
-    color: "lightblue",
+    color: "goldenrod",
+  },
+  setItemText: {
+    width: 260,
+    color: "lime",
   },
   itemRow: {
     flexDirection: "row",
@@ -220,7 +244,7 @@ const ColumnText = styled(ModeText)<{
   width: ${(props) => (props.width ? `${props.width}px` : "260px")};
   justify-content: center;
   align-items: center;
-  text-align: ${(props) => props.textAlign ?? "left"};
+  text-align: ${(props) => (props.textAlign ? props.textAlign : "left")};
 `;
 const LinkText = styled(ColumnText)`
   color: lightblue;

@@ -1,4 +1,4 @@
-import { CheckBox, Text, View, StyleSheet } from "react-native";
+import { CheckBox, View, StyleSheet, TextStyle } from "react-native";
 import React from "react";
 import { ModeText } from "./ModeText";
 
@@ -6,14 +6,22 @@ export function FilterSelect({
   value,
   onValueChange,
   title,
+  titleColor,
 }: {
   value: boolean;
   onValueChange: (value: ((prevState: boolean) => boolean) | boolean) => void;
   title: string;
+  titleColor?: string;
 }) {
+  const textStyle: TextStyle[] = [styles.text];
+
+  if (titleColor !== undefined) {
+    textStyle.push({ color: titleColor });
+  }
+
   return (
     <View style={styles.container}>
-      <ModeText style={styles.text}>{title}</ModeText>
+      <ModeText style={textStyle}>{title}</ModeText>
       <CheckBox value={value} onValueChange={onValueChange} />
     </View>
   );
