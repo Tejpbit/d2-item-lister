@@ -18,8 +18,8 @@ import (
 )
 
 type TotalState struct {
-	Characters []d2s.Character `json:"characters"`
-	SharedStash []d2s.Item `json:"shared_stash"`
+	Characters  []d2s.Character `json:"characters"`
+	SharedStash []d2s.Item      `json:"shared_stash"`
 }
 
 func (state TotalState) writeJsonFile() error {
@@ -38,8 +38,7 @@ func (state TotalState) writeJsonFile() error {
 func main() {
 	fmt.Printf("Args: %s\n", os.Args)
 
-	saveDir := os.Args[1];
-
+	saveDir := os.Args[1]
 
 	fmt.Printf("stashFile: %s\n", saveDir)
 
@@ -48,7 +47,7 @@ func main() {
 	}
 
 	if _, err := os.Stat(saveDir); os.IsNotExist(err) {
-		fmt.Printf("%s does not exist", saveDir);
+		fmt.Printf("%s does not exist", saveDir)
 	}
 
 	saveDir, err := filepath.Abs(saveDir)
@@ -57,38 +56,25 @@ func main() {
 
 	fmt.Printf("SharedStashFile is %s\n", sharedStashFile)
 
-
 	if _, err := os.Stat(sharedStashFile); os.IsNotExist(err) {
-		fmt.Printf("%s does not exist", saveDir);
+		fmt.Printf("%s does not exist", saveDir)
 		return
 	}
-	items, err := parseShardStash(sharedStashFile)
+	items, err := parseSharedStash(sharedStashFile)
 	if err != nil {
 		fmt.Printf("Couldn't generate json from d2 files. %v", err)
 		return
 	}
-	var characters []d2s.Character
-	err = filepath.Walk(saveDir, func(path string, info os.FileInfo, err error) error {
-		if strings.HasSuffix(path, "d2s") {
-			char, err := parseCharacter(path)
-			if err != nil {
-				panic(err)
-			}
-			characters = append(characters, *char)
-		}
-		return nil
-	})
+	characters, err := parseCharacters(saveDir)
 	if err != nil {
 		panic("couldn't parse characters")
 	}
-
 
 	var totalState = TotalState{Characters: characters, SharedStash: items}
 	err = totalState.writeJsonFile()
 	if err != nil {
 		panic("err")
 	}
-
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -103,7 +89,7 @@ func main() {
 
 	err = setupWatchers(saveDir, watcher)
 	if err != nil {
-		fmt.Printf("couldn't setup file watchers %v",  err)
+		fmt.Printf("couldn't setup file watchers %v", err)
 		panic(err)
 	}
 
@@ -120,23 +106,35 @@ func main() {
 					time.Sleep(time.Second)
 
 					if _, err := os.Stat(sharedStashFile); os.IsNotExist(err) {
-						fmt.Printf("%s does not exist", saveDir);
+						fmt.Printf("%s does not exist", saveDir)
 						return
 					}
-					items, err = parseShardStash(sharedStashFile)
+					items, err = parseSharedStash(sharedStashFile)
 					if err != nil {
 						fmt.Printf("Error generating json from d2 files. %v", err)
 						panic(err)
 					}
-
-
 					err := watcher.Add(event.Name) // Watcher dies when file is removed
+
+					totalState.SharedStash = items
+
 					if err != nil {
 						fmt.Printf("Error, %v", err)
 					} else {
 						fmt.Printf("Watching sharedStashfile again")
 
 					}
+				} else if event.Op&fsnotify.Write == fsnotify.Write {
+					characters, err = parseCharacters(saveDir)
+					if err != nil {
+						panic("couldn't parse characters")
+					}
+					totalState.Characters = characters
+				}
+				err = totalState.writeJsonFile()
+				if err != nil {
+					fmt.Printf("Couldn't write json file %s", err)
+					panic(err)
 				}
 
 				// watch for errors
@@ -147,6 +145,21 @@ func main() {
 	}()
 
 	<-done
+}
+
+func parseCharacters(saveDir string) ([]d2s.Character, error) {
+	var characters []d2s.Character
+	err := filepath.Walk(saveDir, func(path string, info os.FileInfo, err error) error {
+		if strings.HasSuffix(path, "d2s") {
+			char, err := parseCharacter(path)
+			if err != nil {
+				return err
+			}
+			characters = append(characters, *char)
+		}
+		return nil
+	})
+	return characters, err
 }
 
 func setupWatchers(saveDir string, watcher *fsnotify.Watcher) error {
@@ -160,8 +173,6 @@ func setupWatchers(saveDir string, watcher *fsnotify.Watcher) error {
 		return nil
 	})
 }
-
-
 
 func parseCharacter(path string) (*d2s.Character, error) {
 	file, err := os.Open(path)
@@ -181,7 +192,7 @@ func parseCharacter(path string) (*d2s.Character, error) {
 
 // https://d2mods.info/forum/viewtopic.php?t=31359
 // https://d2mods.info/forum/viewtopic.php?p=71793#71793
-func parseShardStash(path string) ([]d2s.Item, error) {
+func parseSharedStash(path string) ([]d2s.Item, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Printf("Error while opening .d2s file")
@@ -259,25 +270,23 @@ func readSharedStashHeader(bfr *bufio.Reader) error {
 	if err != nil {
 		panic(err)
 	}
-	if (int(b1) != 83) {
+	if int(b1) != 83 {
 		return fmt.Errorf("could read shared stash header, should be 83, was %d", b1)
 	}
-
 
 	b2, err := bfr.ReadByte()
 	if err != nil {
 		panic(err)
 	}
-	if (int(b2) != 83) {
+	if int(b2) != 83 {
 		return fmt.Errorf("could read shared stash header, should be 83, was %d", b2)
 	}
-
 
 	b3, err := bfr.ReadByte()
 	if err != nil {
 		panic(err)
 	}
-	if (int(b3) != 83) {
+	if int(b3) != 83 {
 		return fmt.Errorf("could read shared stash header, should be 83, was %d", b3)
 	}
 
@@ -285,7 +294,7 @@ func readSharedStashHeader(bfr *bufio.Reader) error {
 	if err != nil {
 		panic(err)
 	}
-	if (int(b4) != 83) {
+	if int(b4) != 83 {
 		return fmt.Errorf("could read shared stash header, should be 0, was %d", b4)
 	}
 	return nil
@@ -315,6 +324,7 @@ func readSharedGoldAmount(bfr *bufio.Reader) (int, error) {
 type StashNum struct {
 	Count uint16
 }
+
 func readNumberOfStashes(bfr *bufio.Reader) (uint16, error) {
 	p := make([]byte, 4)
 	n, err := io.ReadFull(bfr, p)
@@ -340,7 +350,7 @@ func readNumberOfStashes(bfr *bufio.Reader) (uint16, error) {
 	return a.Count, nil
 }
 
-func prettyPrintBytes(bfr *bufio.Reader)  {
+func prettyPrintBytes(bfr *bufio.Reader) {
 	for i := 0; i < 10; i++ {
 		b, e := bfr.ReadByte()
 		if e != nil {
