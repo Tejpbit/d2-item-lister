@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/websocket"
 	"github.com/nokka/d2s"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -35,19 +33,6 @@ var (
 		},
 	}
 )
-
-func (state TotalState) writeJsonFile() error {
-	fmt.Println("Write json file")
-	jsonBytes, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile("d2-item-lister/TotalState.json", jsonBytes, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 func main() {
 	fmt.Printf("Args: %s\n", os.Args)
@@ -89,11 +74,7 @@ func main() {
 	}
 
 	var _totalState = TotalState{Characters: characters, SharedStash: items}
-	err = _totalState.writeJsonFile()
 	totalState = _totalState
-	if err != nil {
-		panic("err")
-	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -150,11 +131,6 @@ func main() {
 					totalState.Characters = characters
 				}
 				sendToWebsocket <- &totalState
-				err = totalState.writeJsonFile()
-				if err != nil {
-					fmt.Printf("Couldn't write json file %s", err)
-					panic(err)
-				}
 
 				// watch for errors
 			case err := <-watcher.Errors:
