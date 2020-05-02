@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"github.com/gorilla/websocket"
 	"github.com/nokka/d2s"
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +23,18 @@ type TotalState struct {
 	Characters  []d2s.Character `json:"characters"`
 	SharedStash []d2s.Item      `json:"shared_stash"`
 }
+
+var (
+	totalState = TotalState{}
+	sendToWebsocket = make(chan *TotalState)
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
+)
 
 func (state TotalState) writeJsonFile() error {
 	fmt.Println("Write json file")
@@ -38,16 +52,20 @@ func (state TotalState) writeJsonFile() error {
 func main() {
 	fmt.Printf("Args: %s\n", os.Args)
 
+	go hostFrontend()
+
+	if len(os.Args) < 2 {
+		fmt.Print()
+
+		panic("Missing arg for save dir e.g. .\\d2-items-reader \"<...>\\Diablo II\\Saves\\1.13d>\"")
+	}
 	saveDir := os.Args[1]
 
-	fmt.Printf("stashFile: %s\n", saveDir)
-
-	if saveDir == "" {
-		fmt.Print("Missing flag for save dir e.g. --saveDir.\"...\\Diablo II\\Saves\\1.13d>\"")
-	}
+	fmt.Printf("D2 save directory: %s\n", saveDir)
 
 	if _, err := os.Stat(saveDir); os.IsNotExist(err) {
 		fmt.Printf("%s does not exist", saveDir)
+		return;
 	}
 
 	saveDir, err := filepath.Abs(saveDir)
@@ -70,8 +88,9 @@ func main() {
 		panic("couldn't parse characters")
 	}
 
-	var totalState = TotalState{Characters: characters, SharedStash: items}
-	err = totalState.writeJsonFile()
+	var _totalState = TotalState{Characters: characters, SharedStash: items}
+	err = _totalState.writeJsonFile()
+	totalState = _totalState
 	if err != nil {
 		panic("err")
 	}
@@ -100,7 +119,6 @@ func main() {
 			select {
 			case event, ok := <-watcher.Events:
 				fmt.Printf("EVENT! %v - %#v\n", ok, event)
-				fmt.Printf("%s %s %s %s %s", event.Op&fsnotify.Create, event.Op&fsnotify.Write, event.Op&fsnotify.Remove, event.Op&fsnotify.Rename, event.Op&fsnotify.Chmod)
 				if event.Op&fsnotify.Remove == fsnotify.Remove {
 					fmt.Printf("Remove")
 					time.Sleep(time.Second)
@@ -131,6 +149,7 @@ func main() {
 					}
 					totalState.Characters = characters
 				}
+				sendToWebsocket <- &totalState
 				err = totalState.writeJsonFile()
 				if err != nil {
 					fmt.Printf("Couldn't write json file %s", err)
@@ -145,6 +164,59 @@ func main() {
 	}()
 
 	<-done
+}
+
+
+
+
+func hostFrontend() {
+	fs := http.FileServer(http.Dir("./web-build"))
+	http.Handle("/", fs)
+	http.HandleFunc("/ws", serveWs)
+
+	log.Println("Listening on :3000...")
+	err := http.ListenAndServe(":3000", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func serveWs(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		if _, ok := err.(websocket.HandshakeError); !ok {
+			log.Println(err)
+		}
+		return
+	}
+	defer ws.Close()
+
+	//var lastMod time.Time
+	//if n, err := strconv.ParseInt(r.FormValue("lastMod"), 16, 64); err == nil {
+	//	lastMod = time.Unix(0, n)
+	//}
+	err = ws.WriteMessage(websocket.TextMessage, []byte("Hello"))
+	if err != nil {
+		panic(err)
+	}
+
+	err = ws.WriteJSON(totalState)
+	if err != nil {
+		panic(err)
+	}
+
+
+	for {
+		state := <- sendToWebsocket
+		err = ws.WriteJSON(*state)
+		if err != nil {
+			log.Println("couldn't write json to ws")
+			log.Println(err)
+			break
+		}
+		log.Println("Sent new state over websocket")
+	}
 }
 
 func parseCharacters(saveDir string) ([]d2s.Character, error) {
