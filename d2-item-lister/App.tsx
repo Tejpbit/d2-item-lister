@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from "react";
 import {
-  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import styled from "styled-components/native";
 import { Item, ItemWithSource, State } from "./types";
 import { FilterSelect } from "./src/components/FilterSelector";
 import { ModeText } from "./src/components/ModeText";
+import { Link } from "./src/components/Link";
 
 const fixyfix = (state: State | null): ItemWithSource[] => {
   if (state === null) {
@@ -189,6 +188,7 @@ export default function App() {
         <ScrollView>
           {itemsToShow.map((item) => {
             const uniqueOrSetName = item.set_name || item.unique_name;
+            console.log("u/s", uniqueOrSetName);
             let uniqueOrSetStyle = styles.linkText;
             if (item.set_name) {
               uniqueOrSetStyle = styles.setItemText;
@@ -215,20 +215,18 @@ export default function App() {
                 }${item.type_name}${
                   item.magic_suffix_name ? " of " + item.magic_suffix_name : ""
                 }`}</ColumnText>
-                {/*ItemsEntity*/}
-                <TouchableOpacity
-                  onPress={() =>
-                    Linking.openURL(
-                      `https://diablo.fandom.com/wiki/${
-                        item.set_name || item.unique_name
-                      }`
-                    )
-                  }
-                >
-                  <LinkText style={uniqueOrSetStyle}>
-                    {uniqueOrSetName}
-                  </LinkText>
-                </TouchableOpacity>
+
+                {uniqueOrSetName && (
+                  <Link
+                    to={`https://diablo.fandom.com/wiki/${
+                      item.set_name || item.unique_name
+                    }`}
+                  >
+                    <ModeText style={uniqueOrSetStyle}>
+                      {uniqueOrSetName}
+                    </ModeText>
+                  </Link>
+                )}
               </ItemRow>
             );
           })}
@@ -248,12 +246,13 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: "row",
   },
-  linkText: {
+  cellWidth: {
     width: 260,
+  },
+  linkText: {
     color: "goldenrod",
   },
   setItemText: {
-    width: 260,
     color: "lime",
   },
   itemRow: {
@@ -290,7 +289,4 @@ const ColumnText = styled(ModeText)<{
   justify-content: center;
   align-items: center;
   text-align: ${(props) => (props.textAlign ? props.textAlign : "left")};
-`;
-const LinkText = styled(ColumnText)`
-  color: lightblue;
 `;
