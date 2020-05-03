@@ -23,9 +23,9 @@ type TotalState struct {
 }
 
 var (
-	totalState = TotalState{}
+	totalState      = TotalState{}
 	sendToWebsocket = make(chan *TotalState)
-	upgrader = websocket.Upgrader{
+	upgrader        = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
@@ -50,7 +50,7 @@ func main() {
 
 	if _, err := os.Stat(saveDir); os.IsNotExist(err) {
 		fmt.Printf("%s does not exist", saveDir)
-		return;
+		return
 	}
 
 	saveDir, err := filepath.Abs(saveDir)
@@ -142,9 +142,6 @@ func main() {
 	<-done
 }
 
-
-
-
 func hostFrontend() {
 	fs := http.FileServer(http.Dir("./web-build"))
 	http.Handle("/", fs)
@@ -182,9 +179,8 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-
 	for {
-		state := <- sendToWebsocket
+		state := <-sendToWebsocket
 		err = ws.WriteJSON(*state)
 		if err != nil {
 			log.Println("couldn't write json to ws")
@@ -255,7 +251,10 @@ func parseSharedStash(path string) ([]d2s.Item, error) {
 	//}
 
 	bfr := bufio.NewReader(file)
-	readSharedStashHeader(bfr)
+	err = readSharedStashHeader(bfr)
+	if err != nil {
+		return nil, err
+	}
 	version, err := readFileVersion(bfr)
 	if err != nil {
 		return nil, err
@@ -342,7 +341,7 @@ func readSharedStashHeader(bfr *bufio.Reader) error {
 	if err != nil {
 		panic(err)
 	}
-	if int(b4) != 83 {
+	if int(b4) != 0 {
 		return fmt.Errorf("could read shared stash header, should be 0, was %d", b4)
 	}
 	return nil
