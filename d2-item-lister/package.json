@@ -8,6 +8,7 @@
     "eject": "expo eject"
   },
   "dependencies": {
+    "@types/reduce-reducers": "^1.0.0",
     "@types/styled-components": "^5.1.0",
     "expo": "~37.0.3",
     "prettier": "^2.0.5",
@@ -16,6 +17,7 @@
     "react-native": "https://github.com/expo/react-native/archive/sdk-37.0.1.tar.gz",
     "react-native-screens": "~2.2.0",
     "react-native-web": "~0.11.7",
+    "reduce-reducers": "^1.0.4",
     "styled-components": "^5.1.0"
   },
   "devDependencies": {

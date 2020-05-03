@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useReducer, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import styled from "styled-components/native";
@@ -11,6 +12,8 @@ import { Item, ItemWithSource, State } from "./types";
 import { FilterSelect } from "./src/components/FilterSelector";
 import { ModeText } from "./src/components/ModeText";
 import { Link } from "./src/components/Link";
+import _ from "lodash";
+import { useStoredReducer } from "./src/customHooks/useStoredReducer";
 
 const fixyfix = (state: State | null): ItemWithSource[] => {
   if (state === null) {
@@ -48,14 +51,126 @@ function isGem(i: Item) {
   );
 }
 
+function sortbyReducer(state: string[], action: string): string[] {
+  if (state[0] && state[0] == action) {
+    return state.filter((s) => s !== action);
+  }
+  if (action in state) {
+    return [action, ...state.filter((s) => s !== action)];
+  } else {
+    return [action, ...state];
+  }
+}
+
+interface ColumnHeaderProps {
+  title: string;
+  sortByKey?: string;
+  onPress?: (sortByKey: string) => void;
+  width?: number;
+}
+
+const ColumnHeader: React.FC<ColumnHeaderProps> = ({
+  onPress,
+  title,
+  sortByKey,
+  width,
+}) => {
+  if (onPress === undefined || sortByKey == undefined) {
+    return (
+      <ColumnText width={width} textAlign="center">
+        {title}
+      </ColumnText>
+    );
+  }
+  return (
+    <TouchableOpacity onPress={() => onPress(sortByKey)}>
+      <ColumnText width={width} textAlign="center">
+        {title}
+      </ColumnText>
+    </TouchableOpacity>
+  );
+};
+
+interface SetFilterCheckbox {
+  type: "SetFilterCheckbox";
+  key: string;
+  value: boolean;
+}
+
+interface SetSerchtermAction {
+  type: "SetSearchterm";
+  searchTerm: string;
+}
+
+interface SetState {
+  type: "SetState";
+  state: any;
+}
+
+interface SearchAndFilterState {
+  searchTerm: string;
+  checkboxes: Record<string, boolean>;
+}
+
+const initialSearchAndFilterState = {
+  searchTerm: "",
+  checkboxes: {
+    showUnique: true,
+    showSets: true,
+    showGems: false,
+    showRunes: false,
+    showSocketed: false,
+    onlyShowFilters: false,
+  },
+};
+
+const setFilterCheckbox = (key: string, value: boolean): SetFilterCheckbox => ({
+  type: "SetFilterCheckbox",
+  key,
+  value,
+});
+
+const searchAndFilterReducer = (
+  state: SearchAndFilterState,
+  action: SetFilterCheckbox | SetSerchtermAction | SetState
+): SearchAndFilterState => {
+  switch (action.type) {
+    case "SetFilterCheckbox":
+      return {
+        ...state,
+        checkboxes: {
+          ...state.checkboxes,
+          [action.key]: action.value,
+        },
+      };
+    case "SetSearchterm":
+      return { ...state, searchTerm: action.searchTerm };
+    case "SetState":
+      return action.state;
+    default:
+      return state;
+  }
+};
+
 export default function App() {
-  const [totalState, setTotalState] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showUnique, setShowUnique] = useState(true);
-  const [showSets, setShowSets] = useState(true);
-  const [showGems, setShowGems] = useState(false);
-  const [showRunes, setShowRunes] = useState(false);
-  const [onlyShowFilters, setOnlyShowFilters] = useState(false);
+  const [searchAndFilter, dispatchSearchAndFilter] = useStoredReducer(
+    searchAndFilterReducer,
+    initialSearchAndFilterState,
+    "searchAndFilter"
+  );
+
+  const {
+    searchTerm,
+    checkboxes: {
+      showUnique,
+      showSets,
+      showGems,
+      showRunes,
+      showSocketed,
+      onlyShowFilters,
+    },
+  } = searchAndFilter;
+  const [totalState, setTotalState] = useState<null | State>(null);
 
   const allItems = fixyfix(totalState);
 
@@ -85,10 +200,11 @@ export default function App() {
     if (i.type_name.includes("Rune")) {
       return showRunes;
     }
+    if (i.socketed) {
+      return showSocketed;
+    }
     return !onlyShowFilters;
   });
-
-  // itemsToShow = _.orderBy(itemsToShow, "level");
 
   const [ws, setWs] = useState<null | WebSocket>(null);
 
@@ -102,7 +218,7 @@ export default function App() {
         setTotalState(totalState);
         console.log("set new state");
       } catch {
-        console.log("Not json");
+        console.log("Data from backend", e);
       }
     };
     ws.onopen = () => {
@@ -113,6 +229,10 @@ export default function App() {
     ws.onerror = wsLog("onError");
     setWs(ws);
   }, []);
+
+  const [sortOrder, dispatchSortBy] = useReducer(sortbyReducer, []);
+
+  itemsToShow = _.orderBy(itemsToShow, sortOrder);
 
   if (ws === null) {
     return (
@@ -132,7 +252,12 @@ export default function App() {
           placeholderTextColor="#ccc"
           style={styles.searchField}
           value={searchTerm}
-          onChangeText={setSearchTerm}
+          onChangeText={(searchTerm) =>
+            dispatchSearchAndFilter({
+              type: "SetSearchterm",
+              searchTerm,
+            })
+          }
         />
         <View>
           <ModeText>
@@ -145,50 +270,79 @@ export default function App() {
             titleColor="goldenrod"
             title="Unique"
             value={showUnique}
-            onValueChange={setShowUnique}
+            onValueChange={(value) =>
+              dispatchSearchAndFilter(setFilterCheckbox("showUnique", value))
+            }
           />
           <FilterSelect
             titleColor="lime"
             title="Sets"
             value={showSets}
-            onValueChange={setShowSets}
+            onValueChange={(value) =>
+              dispatchSearchAndFilter(setFilterCheckbox("showSets", value))
+            }
           />
           <FilterSelect
             title="Gems"
             value={showGems}
-            onValueChange={setShowGems}
+            onValueChange={(value) =>
+              dispatchSearchAndFilter(setFilterCheckbox("showGems", value))
+            }
           />
           <FilterSelect
             title="Runes"
             value={showRunes}
-            onValueChange={setShowRunes}
+            onValueChange={(value) =>
+              dispatchSearchAndFilter(setFilterCheckbox("showRunes", value))
+            }
+          />
+          <FilterSelect
+            title="Socketed"
+            value={showSocketed}
+            onValueChange={(value) =>
+              dispatchSearchAndFilter(setFilterCheckbox("showSocketed", value))
+            }
           />
           <FilterSelect
             title="Only show Filters"
             value={onlyShowFilters}
-            onValueChange={setOnlyShowFilters}
+            onValueChange={(value) =>
+              dispatchSearchAndFilter(
+                setFilterCheckbox("onlyShowFilters", value)
+              )
+            }
           />
         </View>
         <ItemRow style={styles.tableHeader}>
-          <ColumnText width={120} textAlign="center">
-            Item Source
-          </ColumnText>
-          <ColumnText width={60} textAlign="center">
-            Item Level
-          </ColumnText>
-          <ColumnText width={60} textAlign="center">
-            Sockets
-          </ColumnText>
-          <ColumnText width={120} textAlign="center">
-            Rare Names
-          </ColumnText>
-          <ColumnText textAlign="center">Name</ColumnText>
-          <ColumnText textAlign="center">Unique/Set Name</ColumnText>
+          <ColumnHeader
+            title="Item Source"
+            sortByKey="itemSource"
+            onPress={dispatchSortBy}
+            width={120}
+          />
+          <ColumnHeader
+            title="Item Level"
+            sortByKey="level"
+            onPress={dispatchSortBy}
+            width={60}
+          />
+          <ColumnHeader
+            title="Sockets"
+            sortByKey="total_nr_of_sockets"
+            onPress={dispatchSortBy}
+            width={60}
+          />
+          <ColumnHeader title="Rare Names" width={120} />
+          <ColumnHeader
+            title="Name"
+            onPress={dispatchSortBy}
+            sortByKey="type_name"
+          />
+          <ColumnHeader title="Unique/Set Name" />
         </ItemRow>
         <ScrollView>
           {itemsToShow.map((item) => {
             const uniqueOrSetName = item.set_name || item.unique_name;
-            console.log("u/s", uniqueOrSetName);
             let uniqueOrSetStyle = styles.linkText;
             if (item.set_name) {
               uniqueOrSetStyle = styles.setItemText;
@@ -205,7 +359,7 @@ export default function App() {
                 <ColumnText width={60} textAlign="center">
                   {item.total_nr_of_sockets === 0
                     ? ""
-                    : item.total_nr_of_sockets}
+                    : `${item.nr_of_items_in_sockets}/${item.total_nr_of_sockets}`}
                 </ColumnText>
                 <ColumnText width={120}>
                   {joinRemoveUndefined([item.rare_name, item.rare_name2])}
@@ -227,6 +381,7 @@ export default function App() {
                     </ModeText>
                   </Link>
                 )}
+                {!uniqueOrSetName && <ColumnText />}
               </ItemRow>
             );
           })}

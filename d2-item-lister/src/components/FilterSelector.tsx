@@ -9,7 +9,7 @@ export function FilterSelect({
   titleColor,
 }: {
   value: boolean;
-  onValueChange: (value: ((prevState: boolean) => boolean) | boolean) => void;
+  onValueChange: (value: boolean) => void;
   title: string;
   titleColor?: string;
 }) {

@@ -1229,6 +1229,13 @@
     "@types/prop-types" "*"
     csstype "^2.2.0"
 
+"@types/reduce-reducers@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@types/reduce-reducers/-/reduce-reducers-1.0.0.tgz#033120b109159f4b344210ee75310d1ec3fcc8ef"
+  integrity sha512-MWKF9QDH/HaMQZvGyQlrut1ttyrFVIrGZqhCXPBcl5LelhnfC7dIE2jK2qZjxFHUCeXgjKCk5hN+/GzA7GgqjQ==
+  dependencies:
+    reduce-reducers "*"
+
 "@types/stack-utils@^1.0.1":
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/@types/stack-utils/-/stack-utils-1.0.1.tgz#0a851d3bd96498fa25c33ab7278ed3bd65f06c3e"
@@ -4470,6 +4477,11 @@ readable-stream@^2.0.1, readable-stream@^2.2.2, readable-stream@~2.3.6:
     safe-buffer "~5.1.1"
     string_decoder "~1.1.1"
     util-deprecate "~1.0.1"
+
+reduce-reducers@*, reduce-reducers@^1.0.4:
+  version "1.0.4"
+  resolved "https://registry.yarnpkg.com/reduce-reducers/-/reduce-reducers-1.0.4.tgz#fb77e751a9eb0201760ac5a605ca8c9c2d0537f8"
+  integrity sha512-Mb2WZ2bJF597exiqX7owBzrqJ74DHLK3yOQjCyPAaNifRncE8OD0wFIuoMhXxTnHK07+8zZ2SJEKy/qtiyR7vw==
 
 regenerate-unicode-properties@^8.2.0:
   version "8.2.0"
